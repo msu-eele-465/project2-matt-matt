@@ -46,11 +46,11 @@ init:
             bis.w	#TBCLR, &TB0CTL				; Clear timer & dividers
 			bis.w	#TBSSEL__ACLK, &TB0CTL		; Select ACLK as timer source
 			bis.w	#MC__CONTINUOUS, &TB0CTL	; Choose continuous counting
-			bis.w	#CNTL_1, &TB0CTL        ; 2^12 
-			bis.w	#ID__8, &TB0CTL         ; Divide clock by 8
-			bis.w	#TBIE, &TB0CTL			; Enable overflow interrupt
-			bic.w	#TBIFG, &TB0CTL			; Clear interrupt flag
-            NOP
+			bis.w	#CNTL_1, &TB0CTL            ; 2^12 
+			bis.w	#ID__8, &TB0CTL             ; Divide clock by 8
+			bis.w	#TBIE, &TB0CTL			    ; Enable overflow interrupt
+			bic.w	#TBIFG, &TB0CTL			    ; Clear interrupt flag
+            ;-----------------------------------------
 
             ; Disable Low Power Mode
 		    bic.w	#LOCKLPM5, &PM5CTL0
@@ -59,6 +59,9 @@ init:
 
 main:
             call    #i2c_start
+            call    #i2c_address
+            call    #i2c_ack
+            call    #i2c_stop
             nop 
             jmp     main
             nop
@@ -68,35 +71,84 @@ main:
 ;------------------------------------------------------------------------------
 
 i2c_start:
-
             bic.b   #BIT0,&P3OUT
-            call    #i2c_start_delay
+            call    #i2c_delay
             bic.b   #BIT2,&P3OUT
-            call    #i2c_start_delay
 
             ret
             nop
 ;-------------- END i2c_start --------------
 
 i2c_stop:
+            call    #i2c_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
             bis.b   #BIT0,&P3OUT
-            jmp     main
-            nop
-;-------------- END i2c_start --------------
+            call    #i2c_delay
 
-i2c_start_delay:
-			bic.w	#GIE, SR				; Disable maskable interrupts
-
-            push    R4
-            mov.w   #60000, R4
-start_loop  dec     R4
-            jnz     start_loop
-            pop     R4
-
-			bis.w	#GIE, SR				; Enable maskable interrupts
             ret
             nop
-;-------------- END i2c_start --------------
+;-------------- END i2c_stop --------------
+
+i2c_ack:
+            call    #i2c_half_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT0,&P3OUT
+
+            ret
+            nop
+;-------------- END i2c_stop --------------
+
+i2c_address:
+            push    R4
+            mov.w   #8, R4
+bit_loop    call    #i2c_half_delay
+            bis.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b   #BIT0,&P3OUT
+            dec     R4
+            jnz     bit_loop
+
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_stop --------------
+
+i2c_delay:
+
+            push    R4
+            mov.w   #6000, R4
+start_loop0 dec     R4
+            jnz     start_loop0
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_delay --------------
+
+i2c_half_delay:
+
+            push    R4
+            mov.w   #3000, R4
+start_loop1 dec     R4
+            jnz     start_loop1
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_half_delay --------------
 
 
 ;------------------------------------------------------------------------------
@@ -106,11 +158,23 @@ start_loop  dec     R4
 ;TB0 Overflow
 ISR_TB0_Overflow                            ; Triggers every 1.0s 
             xor.b   #BIT6,&P6OUT
-            bis.b   #BIT0,&P3OUT
-            bis.b   #BIT2,&P3OUT
             bic.w   #TBIFG,&TB0CTL
             reti
 ;-------------- END ISR_TB0_Overflow --------------
+
+
+;-------------------------------------------------------------------------------
+; Memmory Allocation
+;-------------------------------------------------------------------------------
+
+		.data							; allocate variables in data memory
+		.retain							; keep allocations even if unused
+
+; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
+Date	.short		04h                 ; 04h is the date on the ds3231 RTC
+Month	.short		05h                 ; 05h is the month on the ds3231 RTC
+Year    .short      06h                 ; 06h is the year on the ds3231 RTC
+
 
 ;------------------------------------------------------------------------------
 ;           Interrupt Vectors
@@ -120,4 +184,5 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 
             .sect	".int42"                ; TB0 interrupt vector
             .short	ISR_TB0_Overflow        ;
+
             .end
