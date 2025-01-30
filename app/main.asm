@@ -59,7 +59,14 @@ init:
 
 main:
             call    #i2c_start
-            call    #i2c_address
+            mov.w   Date,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack
+            mov.w   Month,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack
+            mov.w   #042h,Data
+            call    #i2c_tx_byte
             call    #i2c_ack
             call    #i2c_stop
             nop 
@@ -106,12 +113,22 @@ i2c_ack:
             nop
 ;-------------- END i2c_stop --------------
 
-i2c_address:
+i2c_tx_byte:
             push    R4
-            mov.w   #8, R4
-bit_loop    call    #i2c_half_delay
-            bis.b   #BIT0,&P3OUT
+            push    R7
+            mov.w   #7, R4
+            mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
+            rlc.w   R7
+            clrc
+
+; looping throug the address
+bit_loop
             call    #i2c_half_delay
+            clrc
+            rlc.w   R7
+            JNC     No_carry1
+            bis.b   #BIT0,&P3OUT
+No_carry1   call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
@@ -120,6 +137,14 @@ bit_loop    call    #i2c_half_delay
             dec     R4
             jnz     bit_loop
 
+; setting the wr bit (8th bit)
+            call    #i2c_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+
+            pop     R7
             pop     R4
 
             ret
@@ -171,10 +196,20 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.retain							; keep allocations even if unused
 
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Date	.short		04h                 ; 04h is the date on the ds3231 RTC
-Month	.short		05h                 ; 05h is the month on the ds3231 RTC
+Date  	.short	    00000400h           ; 04h is the date on the ds3231 RTC
+Month	.short		00000500h           ; 05h is the month on the ds3231 RTC
 Year    .short      06h                 ; 06h is the year on the ds3231 RTC
 
+Data    .space      2
+Tx      .space      2
+
+
+;-------------------------------------------------------------------------------
+; Stack Pointer definition
+;-------------------------------------------------------------------------------
+            .global __STACK_END
+            .sect   .stack
+            
 
 ;------------------------------------------------------------------------------
 ;           Interrupt Vectors
