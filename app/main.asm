@@ -58,18 +58,14 @@ init:
             NOP
 
 main:
-            call    #i2c_start
-            mov.w   Date,Data
-            call    #i2c_tx_byte
-            call    #i2c_ack
-            mov.w   Month,Data
-            call    #i2c_tx_byte
-            call    #i2c_ack
-            mov.w   #042h,Data
-            call    #i2c_tx_byte
-            call    #i2c_ack
-            call    #i2c_stop
-            nop 
+            mov.w   #00, R4
+            mov.w   #09h, R7
+
+main_loop   mov.w   R4,Tx
+            call    #i2c_write
+            add.w   #0100h,R4
+            dec.w   R7
+            jnz     main_loop
             jmp     main
             nop
 
@@ -91,6 +87,7 @@ i2c_stop:
             bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bis.b   #BIT0,&P3OUT
             call    #i2c_delay
@@ -100,15 +97,20 @@ i2c_stop:
 ;-------------- END i2c_stop --------------
 
 i2c_ack:
+            bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
+
+            ; Doing clock cycle to get ack or nack from device
             call    #i2c_half_delay
-            bic.b   #BIT0,&P3OUT
+            ; bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
-            bis.b   #BIT0,&P3OUT
+            ; bis.b   #BIT0,&P3OUT
 
+            bis.b		#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
             ret
             nop
 ;-------------- END i2c_stop --------------
@@ -116,9 +118,8 @@ i2c_ack:
 i2c_tx_byte:
             push    R4
             push    R7
-            mov.w   #7, R4
+            mov.w   #8, R4
             mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
-            rlc.w   R7
             clrc
 
 ; looping throug the address
@@ -130,6 +131,7 @@ bit_loop
             bis.b   #BIT0,&P3OUT
 No_carry1   call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
@@ -138,11 +140,12 @@ No_carry1   call    #i2c_half_delay
             jnz     bit_loop
 
 ; setting the wr bit (8th bit)
-            call    #i2c_delay
-            bis.b   #BIT2,&P3OUT
-            call    #i2c_half_delay
-            bic.b   #BIT2,&P3OUT
-            call    #i2c_half_delay
+            ; call    #i2c_delay
+            ; bis.b   #BIT2,&P3OUT
+            ; call    #i2c_delay
+            ; call    #i2c_half_delay
+            ; bic.b   #BIT2,&P3OUT
+            ; call    #i2c_half_delay
 
             pop     R7
             pop     R4
@@ -151,10 +154,30 @@ No_carry1   call    #i2c_half_delay
             nop
 ;-------------- END i2c_stop --------------
 
+i2c_write:
+            push    R4
+
+            call    #i2c_start
+            mov.w   Adress,R4
+            setc
+            rlc.w   R4
+            mov.w   R4,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack
+            mov.w   Tx,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack
+            call    #i2c_stop
+
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_write --------------
+
 i2c_delay:
 
             push    R4
-            mov.w   #6000, R4
+            mov.w   #1150, R4
 start_loop0 dec     R4
             jnz     start_loop0
             pop     R4
@@ -166,7 +189,7 @@ start_loop0 dec     R4
 i2c_half_delay:
 
             push    R4
-            mov.w   #3000, R4
+            mov.w   #575, R4
 start_loop1 dec     R4
             jnz     start_loop1
             pop     R4
@@ -196,9 +219,7 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.retain							; keep allocations even if unused
 
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Date  	.short	    00000400h           ; 04h is the date on the ds3231 RTC
-Month	.short		00000500h           ; 05h is the month on the ds3231 RTC
-Year    .short      06h                 ; 06h is the year on the ds3231 RTC
+Adress 	.short	    00000400h           ; 04h is the date on the ds3231 RTC
 
 Data    .space      2
 Tx      .space      2
