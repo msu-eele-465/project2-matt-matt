@@ -99,7 +99,7 @@ i2c_stop:
 i2c_ack_delay:
             bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
             bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
-            
+            push    R4
 
             ; Doing clock cycle to get ack or nack from device
             call    #i2c_half_delay
@@ -109,9 +109,15 @@ i2c_ack_delay:
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
+            ; mov.b   &P3IN, R4
+            cmp.w	#00h, &P3IN
+            jz      i2c_ack_delay_end
+            setn
 
-            bic.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+i2c_ack_delay_end
+            bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
             bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            pop     R4
             ret
             nop
 ;-------------- END i2c_ack_delay --------------
@@ -166,6 +172,8 @@ No_carry1   call    #i2c_half_delay
 i2c_write:
             push    R4
 
+i2c_write_address
+            clrn
             call    #i2c_start
             mov.w   Adress,R4
             setc
@@ -173,12 +181,16 @@ i2c_write:
             mov.w   R4,Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
+            ; jn      i2c_write_address
+
+i2c_write_data
             mov.w   Tx,Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
             call    #i2c_stop
+            ; jn      i2c_write_address
 
-            pop     R4
+write_end   pop     R4
             ret
             nop
 ;-------------- END i2c_write --------------
