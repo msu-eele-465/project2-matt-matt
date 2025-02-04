@@ -56,7 +56,6 @@ init:
             ; Disable Low Power Mode
 		    bic.w	#LOCKLPM5, &PM5CTL0
 			bis.w	#GIE, SR				; Enable maskable interrupts
-            NOP
 
 main:
             mov.w   #00, R4
@@ -99,6 +98,8 @@ i2c_stop:
 
 i2c_ack_delay:
             bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
+            bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+            
 
             ; Doing clock cycle to get ack or nack from device
             call    #i2c_half_delay
@@ -109,7 +110,8 @@ i2c_ack_delay:
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
 
-            bis.b		#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            bic.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+            bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
             ret
             nop
 ;-------------- END i2c_ack_delay --------------
@@ -136,8 +138,9 @@ i2c_tx_byte:
             mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
             clrc
 
-; looping throug the address
+; looping throug the data
 bit_loop
+            bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             clrc
             rlc.w   R7
@@ -149,10 +152,10 @@ No_carry1   call    #i2c_half_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
-            bic.b   #BIT0,&P3OUT
             dec     R4
             jnz     bit_loop
 
+            bis.b   #BIT0,&P3OUT
             pop     R7
             pop     R4
 
