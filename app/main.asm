@@ -1,7 +1,7 @@
 ;-------------------------------------------------------------------------------
 ; Include files
             .cdecls C,LIST,"msp430.h"  ; Include device header file
-            .include "i2c.asm"
+            ; .include "i2c.asm"
 ;-------------------------------------------------------------------------------
 
             .def    RESET                   ; Export program entry-point to
@@ -179,39 +179,6 @@ i2c_write:
             ret
             nop
 ;-------------- END i2c_write --------------
-
-i2c_rx_byte:
-            bic.b	#BIT0, &P3DIR	    ; Set P3.0 as an input. P3.0 is GPIO
-
-            push    R4
-            push    R7
-            mov.w   #8, R4
-            mov.w   Data,R7             ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
-            clrc
-
-; looping throug the address
-bit_loop
-            call    #i2c_half_delay
-            clrc
-            rlc.w   R7
-            JNC     No_carry1
-            bis.b   #BIT0,&P3OUT
-No_carry1   call    #i2c_half_delay
-            bis.b   #BIT2,&P3OUT
-            call    #i2c_delay
-            call    #i2c_half_delay
-            bic.b   #BIT2,&P3OUT
-            call    #i2c_half_delay
-            bic.b   #BIT0,&P3OUT
-            dec     R4
-            jnz     bit_loop
-
-            pop     R7
-            pop     R4
-
-            ret
-            nop
-;-------------- END i2c_rx_byte --------------
 
 i2c_delay:
 
