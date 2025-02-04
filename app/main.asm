@@ -1,6 +1,7 @@
 ;-------------------------------------------------------------------------------
 ; Include files
             .cdecls C,LIST,"msp430.h"  ; Include device header file
+            .include "i2c.asm"
 ;-------------------------------------------------------------------------------
 
             .def    RESET                   ; Export program entry-point to
@@ -96,24 +97,37 @@ i2c_stop:
             nop
 ;-------------- END i2c_stop --------------
 
-i2c_ack:
+i2c_ack_delay:
             bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
 
             ; Doing clock cycle to get ack or nack from device
             call    #i2c_half_delay
-            ; bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
             call    #i2c_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
-            ; bis.b   #BIT0,&P3OUT
 
             bis.b		#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
             ret
             nop
-;-------------- END i2c_stop --------------
+;-------------- END i2c_ack_delay --------------
+
+i2c_ack:
+            call    #i2c_half_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT0,&P3OUT
+
+            ret
+            nop
+;-------------- END i2c_ack --------------
 
 i2c_tx_byte:
             push    R4
@@ -139,20 +153,12 @@ No_carry1   call    #i2c_half_delay
             dec     R4
             jnz     bit_loop
 
-; setting the wr bit (8th bit)
-            ; call    #i2c_delay
-            ; bis.b   #BIT2,&P3OUT
-            ; call    #i2c_delay
-            ; call    #i2c_half_delay
-            ; bic.b   #BIT2,&P3OUT
-            ; call    #i2c_half_delay
-
             pop     R7
             pop     R4
 
             ret
             nop
-;-------------- END i2c_stop --------------
+;-------------- END i2c_tx_byte --------------
 
 i2c_write:
             push    R4
@@ -163,16 +169,49 @@ i2c_write:
             rlc.w   R4
             mov.w   R4,Data
             call    #i2c_tx_byte
-            call    #i2c_ack
+            call    #i2c_ack_delay
             mov.w   Tx,Data
             call    #i2c_tx_byte
-            call    #i2c_ack
+            call    #i2c_ack_delay
             call    #i2c_stop
 
             pop     R4
             ret
             nop
 ;-------------- END i2c_write --------------
+
+i2c_rx_byte:
+            bic.b	#BIT0, &P3DIR	    ; Set P3.0 as an input. P3.0 is GPIO
+
+            push    R4
+            push    R7
+            mov.w   #8, R4
+            mov.w   Data,R7             ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
+            clrc
+
+; looping throug the address
+bit_loop
+            call    #i2c_half_delay
+            clrc
+            rlc.w   R7
+            JNC     No_carry1
+            bis.b   #BIT0,&P3OUT
+No_carry1   call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b   #BIT0,&P3OUT
+            dec     R4
+            jnz     bit_loop
+
+            pop     R7
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_rx_byte --------------
 
 i2c_delay:
 
