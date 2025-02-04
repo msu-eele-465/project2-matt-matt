@@ -106,15 +106,16 @@ i2c_ack_delay:
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
             call    #i2c_delay
+            mov.b   &P3IN, R4
+            mov.w   #05h, R5
+            cmp.w	R5, R4
+            jnz      i2c_ack_delay_end
+            mov.w   #01h,Nack_Flag
+
+i2c_ack_delay_end
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
-            ; mov.b   &P3IN, R4
-            cmp.w	#00h, &P3IN
-            jz      i2c_ack_delay_end
-            setn
-
-i2c_ack_delay_end
             bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
             bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
             pop     R4
@@ -173,7 +174,9 @@ i2c_write:
             push    R4
 
 i2c_write_address
-            clrn
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            mov.w   #00h,Nack_Flag
             call    #i2c_start
             mov.w   Adress,R4
             setc
@@ -181,14 +184,18 @@ i2c_write_address
             mov.w   R4,Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
-            ; jn      i2c_write_address
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
 
 i2c_write_data
             mov.w   Tx,Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
             call    #i2c_stop
-            ; jn      i2c_write_address
 
 write_end   pop     R4
             ret
@@ -240,10 +247,11 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.retain							; keep allocations even if unused
 
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Adress 	.short	    00000400h           ; 04h is the date on the ds3231 RTC
+Adress 	    .short	    00000400h           ; 04h is the date on the ds3231 RTC
 
-Data    .space      2
-Tx      .space      2
+Data        .space      2
+Tx          .space      2
+Nack_Flag   .space      2
 
 
 ;-------------------------------------------------------------------------------
