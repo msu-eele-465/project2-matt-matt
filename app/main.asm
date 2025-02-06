@@ -59,7 +59,8 @@ init:
 
 main:
             mov.w   #00, R4
-            mov.w   #09h, R7
+            mov.w   #0Ah, R7
+            mov.w   R7, Data_Count
 
 main_loop   mov.w   R4,Tx
             call    #i2c_write
@@ -172,8 +173,10 @@ No_carry1   call    #i2c_half_delay
 
 i2c_write:
             push    R4
+            push    R7
 
 i2c_write_address
+            mov.w   Data_Count, R7
             bis.b   #BIT0,&P3OUT
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag
@@ -188,16 +191,22 @@ i2c_write_address
             cmp.w   #01h,R4
             jz      i2c_write_address
 
+            mov.w   #Tx, R4
+            
 i2c_write_data
-            mov.w   Tx,Data
+            mov.w   @R4+, Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
             mov.w   Nack_Flag,R4
             cmp.w   #01h,R4
             jz      i2c_write_address
+            dec     R7
+            jnz     i2c_write_data
+
             call    #i2c_stop
 
-write_end   pop     R4
+write_end   pop     R7
+            pop     R4
             ret
             nop
 ;-------------- END i2c_write --------------
@@ -252,6 +261,7 @@ Adress 	    .short	    00000400h           ; 04h is the date on the ds3231 RTC
 Data        .space      2
 Tx          .space      2
 Nack_Flag   .space      2
+Data_Count  .space      2
 
 
 ;-------------------------------------------------------------------------------
