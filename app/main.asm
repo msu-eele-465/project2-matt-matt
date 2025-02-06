@@ -60,13 +60,16 @@ init:
 main:
             mov.w   #00, R4
             mov.w   #0Ah, R7
+            mov.w   #Tx, R5
             mov.w   R7, Data_Count
 
-main_loop   mov.w   R4,Tx
-            call    #i2c_write
-            add.w   #0100h,R4
+main_loop   mov.w   R4,0(R5)
+            inc.w   R5
+            inc.w   R5
+            add.w   #01h,R4
             dec.w   R7
             jnz     main_loop
+            call    #i2c_write
             jmp     main
             nop
 
@@ -101,6 +104,7 @@ i2c_ack_delay:
             bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
             bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
             push    R4
+            push    R5
 
             ; Doing clock cycle to get ack or nack from device
             call    #i2c_half_delay
@@ -119,6 +123,7 @@ i2c_ack_delay_end
             call    #i2c_half_delay
             bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
             bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            pop     R5
             pop     R4
             ret
             nop
@@ -173,17 +178,25 @@ No_carry1   call    #i2c_half_delay
 
 i2c_write:
             push    R4
+            push    R5
             push    R7
 
 i2c_write_address
-            mov.w   Data_Count, R7
             bis.b   #BIT0,&P3OUT
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag
             call    #i2c_start
             mov.w   Adress,R4
             setc
-            rlc.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
             mov.w   R4,Data
             call    #i2c_tx_byte
             call    #i2c_ack_delay
@@ -191,10 +204,22 @@ i2c_write_address
             cmp.w   #01h,R4
             jz      i2c_write_address
 
-            mov.w   #Tx, R4
+            mov.w   Data_Count, R7
+            mov.w   #Tx, R5
             
 i2c_write_data
-            mov.w   @R4+, Data
+            mov.w   0(R5), R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4, Data
+            inc.w   R5
+            inc.w   R5
             call    #i2c_tx_byte
             call    #i2c_ack_delay
             mov.w   Nack_Flag,R4
@@ -206,6 +231,7 @@ i2c_write_data
             call    #i2c_stop
 
 write_end   pop     R7
+            pop     R5
             pop     R4
             ret
             nop
@@ -256,10 +282,10 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.retain							; keep allocations even if unused
 
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Adress 	    .short	    00000400h           ; 04h is the date on the ds3231 RTC
+Adress 	    .short	    000004h           ; 04h is the date on the ds3231 RTC
 
 Data        .space      2
-Tx          .space      2
+Tx          .space      18
 Nack_Flag   .space      2
 Data_Count  .space      2
 
