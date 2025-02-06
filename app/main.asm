@@ -1,6 +1,7 @@
 ;-------------------------------------------------------------------------------
 ; Include files
             .cdecls C,LIST,"msp430.h"  ; Include device header file
+            ; .include "i2c.asm"
 ;-------------------------------------------------------------------------------
 
             .def    RESET                   ; Export program entry-point to
@@ -55,14 +56,20 @@ init:
             ; Disable Low Power Mode
 		    bic.w	#LOCKLPM5, &PM5CTL0
 			bis.w	#GIE, SR				; Enable maskable interrupts
-            NOP
 
 main:
-            call    #i2c_start
-            call    #i2c_address
-            call    #i2c_ack
-            call    #i2c_stop
-            nop 
+            mov.w   #00, R4
+            mov.w   #0Ah, R7
+            mov.w   #Tx, R5
+            mov.w   R7, Data_Count
+
+main_loop   mov.w   R4,0(R5)
+            inc.w   R5
+            inc.w   R5
+            add.w   #01h,R4
+            dec.w   R7
+            jnz     main_loop
+            call    #i2c_write
             jmp     main
             nop
 
@@ -84,6 +91,7 @@ i2c_stop:
             bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bis.b   #BIT0,&P3OUT
             call    #i2c_delay
@@ -92,11 +100,41 @@ i2c_stop:
             nop
 ;-------------- END i2c_stop --------------
 
+i2c_ack_delay:
+            bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
+            bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+            push    R4
+            push    R5
+
+            ; Doing clock cycle to get ack or nack from device
+            call    #i2c_half_delay
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            mov.b   &P3IN, R4
+            mov.w   #05h, R5
+            cmp.w	R5, R4
+            jnz      i2c_ack_delay_end
+            mov.w   #01h,Nack_Flag
+
+i2c_ack_delay_end
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
+            bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_ack_delay --------------
+
 i2c_ack:
             call    #i2c_half_delay
             bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
@@ -104,32 +142,105 @@ i2c_ack:
 
             ret
             nop
-;-------------- END i2c_stop --------------
+;-------------- END i2c_ack --------------
 
-i2c_address:
+i2c_tx_byte:
             push    R4
+            push    R7
             mov.w   #8, R4
-bit_loop    call    #i2c_half_delay
-            bis.b   #BIT0,&P3OUT
+            mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
+            clrc
+
+; looping throug the data
+bit_loop
+            bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
+            clrc
+            rlc.w   R7
+            JNC     No_carry1
+            bis.b   #BIT0,&P3OUT
+No_carry1   call    #i2c_half_delay
             bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
             call    #i2c_half_delay
             bic.b   #BIT2,&P3OUT
             call    #i2c_half_delay
-            bic.b   #BIT0,&P3OUT
             dec     R4
             jnz     bit_loop
 
+            bis.b   #BIT0,&P3OUT
+            pop     R7
             pop     R4
 
             ret
             nop
-;-------------- END i2c_stop --------------
+;-------------- END i2c_tx_byte --------------
+
+i2c_write:
+            push    R4
+            push    R5
+            push    R7
+
+i2c_write_address
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            mov.w   #00h,Nack_Flag
+            call    #i2c_start
+            mov.w   Adress,R4
+            setc
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
+
+            mov.w   Data_Count, R7
+            mov.w   #Tx, R5
+            
+i2c_write_data
+            mov.w   0(R5), R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4, Data
+            inc.w   R5
+            inc.w   R5
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
+            dec     R7
+            jnz     i2c_write_data
+
+            call    #i2c_stop
+
+write_end   pop     R7
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_write --------------
 
 i2c_delay:
 
             push    R4
-            mov.w   #6000, R4
+            mov.w   #1150, R4
 start_loop0 dec     R4
             jnz     start_loop0
             pop     R4
@@ -141,7 +252,7 @@ start_loop0 dec     R4
 i2c_half_delay:
 
             push    R4
-            mov.w   #3000, R4
+            mov.w   #575, R4
 start_loop1 dec     R4
             jnz     start_loop1
             pop     R4
@@ -171,10 +282,20 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.retain							; keep allocations even if unused
 
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Date	.short		04h                 ; 04h is the date on the ds3231 RTC
-Month	.short		05h                 ; 05h is the month on the ds3231 RTC
-Year    .short      06h                 ; 06h is the year on the ds3231 RTC
+Adress 	    .short	    000004h           ; 04h is the date on the ds3231 RTC
 
+Data        .space      2
+Tx          .space      18
+Nack_Flag   .space      2
+Data_Count  .space      2
+
+
+;-------------------------------------------------------------------------------
+; Stack Pointer definition
+;-------------------------------------------------------------------------------
+            .global __STACK_END
+            .sect   .stack
+            
 
 ;------------------------------------------------------------------------------
 ;           Interrupt Vectors
