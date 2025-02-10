@@ -58,8 +58,29 @@ init:
 			bis.w	#GIE, SR				; Enable maskable interrupts
 
 main:
+; ------------------------------------
+;       TX bytes main loop code
+; ------------------------------------
+;             mov.w   #00, R4
+;             mov.w   #0Ah, R7
+;             mov.w   #Tx, R5
+;             mov.w   R7, Data_Count
+
+; main_loop   mov.w   R4,0(R5)
+;             inc.w   R5
+;             inc.w   R5
+;             add.w   #01h,R4
+;             dec.w   R7
+;             jnz     main_loop
+;             call    #i2c_write
+; -----------End TX bytes-------------
+
+; ------------------------------------
+;       RX bytes main loop code
+; ------------------------------------
             mov.w   #00, R4
-            mov.w   #0Ah, R7
+            mov.w   #04, Adress
+            mov.w   #09h, R7
             mov.w   #Tx, R5
             mov.w   R7, Data_Count
 
@@ -69,7 +90,9 @@ main_loop   mov.w   R4,0(R5)
             add.w   #01h,R4
             dec.w   R7
             jnz     main_loop
-            call    #i2c_write
+            call    #i2c_read
+; -----------End RX bytes-------------
+
             jmp     main
             nop
 
@@ -231,6 +254,80 @@ i2c_write_data
             call    #i2c_stop
 
 write_end   pop     R7
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_write --------------
+
+i2c_rx_byte:
+            push    R4
+            push    R7
+            mov.w   #8, R4
+            mov.w   Data,R7
+            clrc
+
+; looping throug the data
+bit_loop2
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            clrc
+            rlc.w   R7
+            JNC     No_carry1
+            bis.b   #BIT0,&P3OUT
+No_carry2   call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            dec     R4
+            jnz     bit_loop
+
+            bis.b   #BIT0,&P3OUT
+            pop     R7
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_rx_byte --------------
+
+i2c_read:
+            push    R4
+            push    R5
+            push    R7
+
+i2c_read_address
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            mov.w   #00h,Nack_Flag
+            call    #i2c_start
+            mov.w   Adress,R4
+            setc
+            rlc.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_read_address
+
+            mov.w   Data_Count, R7
+            mov.w   #Tx, R5
+            
+i2c_read_data
+
+            call    #i2c_stop
+
+read_end    pop     R7
             pop     R5
             pop     R4
             ret
