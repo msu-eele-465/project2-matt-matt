@@ -61,20 +61,33 @@ main:
 ; ------------------------------------
 ;       TX bytes main loop code
 ; ------------------------------------
-;             mov.w   #00, R4
-;             mov.w   #0Ah, R7
-;             mov.w   #Tx, R5
-;             mov.w   R7, Data_Count
+            mov.w   #00, R4
+            mov.w   #068h, Adress
+            mov.w   #04h, R7
+            mov.w   #Tx, R5
+            mov.w   R7, Data_Count
+            mov.w   R4,0(R5)                 ; setting subaddress to write to
 
-; main_loop   mov.w   R4,0(R5)
-;             inc.w   R5
-;             inc.w   R5
-;             add.w   #01h,R4
-;             dec.w   R7
-;             jnz     main_loop
-;             call    #i2c_write
+            inc.w   R5
+            inc.w   R5
+            mov.w   #000h,R4
+            mov.w   R4,0(R5)                ; setting seconds
+
+            inc.w   R5
+            inc.w   R5
+            mov.w   #010h,R4
+            mov.w   R4,0(R5)                ; setting minutes
+
+            inc.w   R5
+            inc.w   R5
+            mov.w   #004h,R4
+            mov.w   R4,0(R5)                ; setting hours
+            call    #i2c_write
+            call    #i2c_stop
 ; -----------End TX bytes-------------
 
+
+read
 ; ------------------------------------
 ;       RX bytes main loop code
 ; ------------------------------------
@@ -84,12 +97,6 @@ main:
             mov.w   #00h, Tx
             mov.w   R7, Data_Count
 
-; main_loop
-;             inc.w   R5
-;             inc.w   R5
-;             add.w   #01h,R4
-;             dec.w   R7
-;             jnz     main_loop
             call    #i2c_write
             call    #i2c_read
             bis.b   #BIT0,&P3OUT
@@ -97,7 +104,7 @@ main:
             call    #i2c_stop
 ; -----------End RX bytes-------------
 
-            jmp     main
+            jmp     read
             nop
 
 ;------------------------------------------------------------------------------
@@ -286,6 +293,7 @@ i2c_rx_byte:
             push    R5
             push    R6
             push    R7
+            mov.w   #00h, R7
             mov.w   #08h, R4
 
 ; looping throug the data
@@ -296,8 +304,7 @@ read_b      call    #i2c_half_delay
 
             ; Checking for 1 or 0 in data
             mov.b   &P3IN, R6
-            mov.w   #05h, R5
-            cmp.w	R5, R6                  ; comparing for a 1 on the input pin
+            cmp.w	 #05h, R6               ; comparing for a 1 on the input pin
             jnz      i2c_rec_z              ; jumps to rotating right arithmatically (adding a zero)
             setc
             rlc.w   R7
@@ -310,7 +317,19 @@ i2c_rel     call    #i2c_half_delay
             dec.w   R4
             jnz     read_b
 
-            mov.w   R7, Rx                  ; moving data to memory
+
+            mov.w   Rx_Count, R5
+            mov.w   #Rx, R6
+i2c_rx_mem_shift
+            cmp.w   #00h, R5
+            jz      i2c_rx_write
+            dec.w   R5
+            inc.w   R6
+            inc.w   R6
+            jmp     i2c_rx_mem_shift
+
+i2c_rx_write
+            mov.w   R7, 0(R6)               ; moving data to memory
 
             bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
             bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
@@ -352,8 +371,12 @@ i2c_read_address
             jz      i2c_read_address
 
             mov.w   #03h, R4
+            mov.w   #00h, R7
+            mov.w   R7, Rx_Count
 i2c_read_data
             call    #i2c_rx_byte
+            inc.w   R7
+            mov.w   R7, Rx_Count
             dec.w   R4
             jz      i2c_read_nack
             call    #i2c_ack
@@ -425,6 +448,7 @@ Rx          .space      18
 Nack_Flag   .space      2
 SubA_Flag   .space      2
 Data_Count  .space      2
+Rx_Count    .space      2
 
 
 ;-------------------------------------------------------------------------------
