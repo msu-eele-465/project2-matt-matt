@@ -316,6 +316,7 @@ write_end   pop     R7
             pop     R5
             pop     R4
             ret
+
             nop
 ;-------------- END i2c_write --------------
 
@@ -453,6 +454,318 @@ start_loop1 dec     R4
 
 
 ;------------------------------------------------------------------------------
+;           Subroutines
+;------------------------------------------------------------------------------
+
+i2c_start:
+            call    #i2c_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_delay
+            bic.b   #BIT2,&P3OUT
+
+            ret
+            nop
+;-------------- END i2c_start --------------
+
+i2c_stop:
+            call    #i2c_half_delay
+            call    #i2c_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bis.b   #BIT0,&P3OUT
+            call    #i2c_delay
+
+            ret
+            nop
+;-------------- END i2c_stop --------------
+
+i2c_ack_delay:
+            bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
+            bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+            push    R4
+            push    R5
+
+            ; Doing clock cycle to get ack or nack from device
+            call    #i2c_half_delay
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            mov.b   &P3IN, R4
+            mov.w   #05h, R5
+            cmp.w	R5, R4
+            jnz      i2c_ack_delay_end
+            mov.w   #01h,Nack_Flag
+
+i2c_ack_delay_end
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
+            bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_ack_delay --------------
+
+i2c_ack:
+            call    #i2c_half_delay
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT0,&P3OUT
+
+            ret
+            nop
+;-------------- END i2c_ack --------------
+
+i2c_nack:
+            call    #i2c_half_delay
+            ; bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            ; bis.b   #BIT0,&P3OUT
+
+            ret
+            nop
+;-------------- END i2c_nack --------------
+
+i2c_tx_byte:
+            push    R4
+            push    R7
+            mov.w   #8, R4
+            mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
+            clrc
+
+; looping through the data
+bit_loop
+            bic.b   #BIT0,&P3OUT
+            call    #i2c_half_delay
+            clrc
+            rlc.w   R7
+            JNC     No_carry1
+            bis.b   #BIT0,&P3OUT
+No_carry1   call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+            call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            dec     R4
+            jnz     bit_loop
+
+            bis.b   #BIT0,&P3OUT
+            pop     R7
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_tx_byte --------------
+
+i2c_write:
+            push    R4
+            push    R5
+            push    R7
+
+i2c_write_address
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            mov.w   #00h,Nack_Flag
+            call    #i2c_start
+            mov.w   Address,R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
+
+            mov.w   Data_Count, R7
+            mov.w   #Tx, R5
+            
+i2c_write_data
+            mov.w   0(R5), R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4, Data
+            inc.w   R5
+            inc.w   R5
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_write_address
+            dec     R7
+            jnz     i2c_write_data
+
+
+write_end   pop     R7
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_write --------------
+
+i2c_rx_byte:
+            bic.b	#BIT0, &P3DIR			; Set P3.0 as an input. P3.0 is GPIO
+            bis.b	#BIT0, &P3REN           ; Setting weak pullup resistor
+            push    R4
+            push    R5
+            push    R6
+            push    R7
+            mov.w   #00h, R7
+            mov.w   #08h, R4
+
+; looping throug the data
+read_b      call    #i2c_half_delay
+            call    #i2c_half_delay
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_delay
+
+            ; Checking for 1 or 0 in data
+            mov.b   &P3IN, R6
+            cmp.w	 #05h, R6               ; comparing for a 1 on the input pin
+            jnz      i2c_rec_z              ; jumps to rotating right arithmatically (adding a zero)
+            setc
+            rlc.w   R7
+            jmp     i2c_rel                 ; if there was a 1, skip adding a zero
+i2c_rec_z   rla.w   R7
+
+i2c_rel     call    #i2c_half_delay
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_half_delay
+            dec.w   R4
+            jnz     read_b
+
+
+            mov.w   Rx_Count, R5
+            mov.w   #Rx, R6
+i2c_rx_mem_shift
+            cmp.w   #00h, R5
+            jz      i2c_rx_write
+            dec.w   R5
+            inc.w   R6
+            inc.w   R6
+            jmp     i2c_rx_mem_shift
+
+i2c_rx_write
+            mov.w   R7, 0(R6)               ; moving data to memory
+
+            bic.b	#BIT0, &P3REN           ; Removing weak pullup resistor
+            bis.b	#BIT0, &P3DIR			; Set P3.0 as an output. P3.0 is GPIO
+            pop     R7
+            pop     R6
+            pop     R5
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_rx_byte --------------
+
+i2c_read:
+            push    R4
+            push    R5
+            push    R7
+
+i2c_read_address
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            mov.w   #00h,Nack_Flag
+            call    #i2c_start
+            mov.w   Address,R4
+            setc
+            rlc.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            rla.w   R4
+            mov.w   R4,Data
+            call    #i2c_tx_byte
+            call    #i2c_ack_delay
+            mov.w   Nack_Flag,R4
+            cmp.w   #01h,R4
+            jz      i2c_read_address
+
+            mov.w   #03h, R4
+            mov.w   #00h, R7
+            mov.w   R7, Rx_Count
+i2c_read_data
+            call    #i2c_rx_byte
+            inc.w   R7
+            mov.w   R7, Rx_Count
+            dec.w   R4
+            jz      i2c_read_nack
+            call    #i2c_ack
+            jmp     i2c_read_data
+
+i2c_read_nack
+            bis.b   #BIT0,&P3OUT
+            bis.b   #BIT2,&P3OUT
+            call    #i2c_nack
+
+read_end    pop     R7
+            pop     R5
+            pop     R4
+            ret
+            nop
+;-------------- END i2c_write --------------
+
+i2c_delay:
+
+            push    R4
+            mov.w   #1150, R4
+start_loop0 dec     R4
+            jnz     start_loop0
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_delay --------------
+
+i2c_half_delay:
+
+            push    R4
+            mov.w   #575, R4
+start_loop1 dec     R4
+            jnz     start_loop1
+            pop     R4
+
+            ret
+            nop
+;-------------- END i2c_half_delay --------------
+
+
+;------------------------------------------------------------------------------
 ;           Interrupt Service Routines
 ;------------------------------------------------------------------------------
 
@@ -471,10 +784,12 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.data							; allocate variables in data memory
 		.retain							; keep allocations even if unused
 
+
 ; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
 Adress 	    .short	    000068h         ; 68h is the adress of the ds3231 RTC
 
 SubAdress   .space      2               ; a place to store subaddresses of the rtc registers
+
 Data        .space      2
 Tx          .space      18
 Rx          .space      18
@@ -482,6 +797,7 @@ Nack_Flag   .space      2
 SubA_Flag   .space      2
 Data_Count  .space      2
 Rx_in_count .space      2
+======
 Rx_Count    .space      2
 
 
