@@ -62,7 +62,7 @@ main:
 ;       TX bytes main loop code
 ; ------------------------------------
             mov.w   #00, R4
-            mov.w   #068h, Adress
+            mov.w   #068h, Address
             mov.w   #04h, R7
             mov.w   #Tx, R5
             mov.w   R7, Data_Count
@@ -92,7 +92,7 @@ read
 ;       RX bytes main loop code
 ; ------------------------------------
             mov.w   #00, R4
-            mov.w   #068h, Adress
+            mov.w   #068h, Address
             mov.w   #01h, R7
             mov.w   #00h, Tx
             mov.w   R7, Data_Count
@@ -202,7 +202,7 @@ i2c_tx_byte:
             mov.w   Data,R7           ; Loading 04h in with 8 trailing 0s 100->100 0000 0000
             clrc
 
-; looping throug the data
+; looping through the data
 bit_loop
             bic.b   #BIT0,&P3OUT
             call    #i2c_half_delay
@@ -237,7 +237,7 @@ i2c_write_address
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag
             call    #i2c_start
-            mov.w   Adress,R4
+            mov.w   Address,R4
             rla.w   R4
             rla.w   R4
             rla.w   R4
@@ -352,7 +352,7 @@ i2c_read_address
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag
             call    #i2c_start
-            mov.w   Adress,R4
+            mov.w   Address,R4
             setc
             rlc.w   R4
             rla.w   R4
@@ -438,10 +438,10 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 		.data							; allocate variables in data memory
 		.retain							; keep allocations even if unused
 
-; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Adress 	    .short	    000068h         ; 68h is the adress of the ds3231 RTC
+; Initialize and Reserve Locations in Data Memory
+Address 	 .short	    000068h         ; 68h is the address of the ds3231 RTC
 
-SubAdress   .space      2               ; a place to store subaddresses of the rtc registers
+SubAddress  .space      2               ; a place to store subaddresses of the rtc registers
 Data        .space      2
 Tx          .space      18
 Rx          .space      18
