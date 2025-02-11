@@ -39,9 +39,82 @@ init:
             NOP
 
 main:
+<<<<<<< Updated upstream
 
             nop 
             jmp main
+=======
+; ------------------------------------
+;       TX bytes main loop code
+; ------------------------------------
+            mov.w   #00, R4
+            mov.w   #068h, Adress
+            mov.w   #04h, R7
+            mov.w   #Tx, R5
+            mov.w   R7, Data_Count
+            mov.w   R4,0(R5)                 ; setting subaddress to write to
+
+            inc.w   R5
+            inc.w   R5
+            mov.w   #000h,R4
+            mov.w   R4,0(R5)                ; setting seconds
+
+            inc.w   R5
+            inc.w   R5
+            mov.w   #015h,R4
+            mov.w   R4,0(R5)                ; setting minutes
+
+            inc.w   R5
+            inc.w   R5
+            mov.w   #010h,R4
+            mov.w   R4,0(R5)                ; setting hours
+            call    #i2c_write
+            call    #i2c_stop
+; -----------End TX bytes-------------
+
+
+read
+; ------------------------------------
+;       RX bytes main loop code
+; ------------------------------------
+            mov.w   #00, R4
+            mov.w   #068h, Adress
+            mov.w   #01h, R7
+            mov.w   #00h, Tx
+            mov.w   R7, Data_Count
+
+            call    #i2c_write
+            call    #i2c_read
+            bis.b   #BIT0,&P3OUT
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_stop
+; -----------End RX bytes-------------
+
+
+; ------------------------------------
+;       RX temperature bytes
+; ------------------------------------
+            mov.w   #011, R4
+            mov.w   #068h, Adress
+            mov.w   #01h, R7
+            mov.w   #00h, Tx
+            mov.w   R7, Data_Count
+            mov.w   #Tx, R5
+            mov.w   R4,0(R5)                 ; setting subaddress to read from
+
+            call    #i2c_write
+            call    #i2c_read
+            bis.b   #BIT0,&P3OUT
+            bic.b   #BIT2,&P3OUT
+            call    #i2c_stop
+            mov.w   #Rx, R6
+            mov.w   0(R6), R4
+            mov.w   1(R6), R5
+
+; -----------End RX bytes-------------
+
+            jmp     read
+>>>>>>> Stashed changes
             nop
 
 ;------------------------------------------------------------------------------
