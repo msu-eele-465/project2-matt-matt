@@ -60,7 +60,7 @@ Here is a flowchart for how the i2c_ack subroutine works:
 Here is a flowchart for how the i2c_nack subroutine works:
 
 <div align="center">
-    <img src="assets/i2c_tx_nack.svg">
+    <img src="assets/i2c_nack.svg">
 </div>
 
 Here is a flowchart for how the i2c_ack_delay subroutine works:
