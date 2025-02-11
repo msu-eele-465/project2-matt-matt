@@ -18,7 +18,7 @@ Then with also reading the temperature registers:
 The following is the circuit diagram used between the RTC and MSP.
 
 <div align="center">
-    <img src="assets/circuit_diagram.png">
+    <img src="assets/circuit_diagram.svg">
 </div>
 
 The following is the main flowchart for how the code should perform; where it first writes the time, writes the control bit to set temperature conversion on the rtc, reads time (seconds, minutes, hours), reads temperature, and finally loops back to setting the control bit for temperature conversion.
