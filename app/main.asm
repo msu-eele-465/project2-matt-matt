@@ -62,7 +62,7 @@ main:
 ;       TX bytes main loop code
 ; ------------------------------------
             mov.w   #00, R4                 ; setting subaddress to write to
-            mov.w   #068h, Adress           ; writing device address to memory
+            mov.w   #068h, Address          ; writing device address to memory
             mov.w   #04h, R7                ; setting byte counter
             mov.w   #Tx, R5                 ; grabbing the address of the mem-var for storing bytes to send over i2c
             mov.w   R7, Data_Count          ; writing the byte count to memory
@@ -83,12 +83,12 @@ main:
             mov.w   #010h,R4
             mov.w   R4,0(R5)                ; writing hours to memory
             call    #i2c_write              ; writing time to the RTC
-            call    #i2c_stop               ; stoping write (not included in write for the sake of restart condition in read)
+            call    #i2c_stop               ; stopping write (not included in write for the sake of restart condition in read)
 ; -----------End TX bytes-------------
 
 
 read
-            mov.w   #068h, Adress           ; writing device address to memory
+            mov.w   #068h, Address          ; writing device address to memory
             mov.w   #02h, R7                ; setting byte counter
             mov.w   R7, Data_Count          ; writing the byte count to memory
             mov.w   #Tx, R5                 ; grabbing the address of the mem-var for storing bytes to send over i2c
@@ -105,7 +105,7 @@ read
 ;       RX bytes main loop code
 ; ------------------------------------
             mov.w   #00, R4                 ; setting subaddress to write to
-            mov.w   #068h, Adress           ; writing device address to memory
+            mov.w   #068h, Address           ; writing device address to memory
             mov.w   #01h, R7                ; setting byte counter
             mov.w   #00h, Tx                ; writing subaddress to memory
             mov.w   R7, Data_Count          ; writing the byte count to memory
@@ -120,7 +120,7 @@ read
 ; ------------------------------------
 ;       RX temperature bytes
 ; ------------------------------------
-            mov.w   #068h, Adress           ; writing device address to memory
+            mov.w   #068h, Address           ; writing device address to memory
             mov.w   #01h, R7                ; setting byte counter
             mov.w   #00h, Tx
             mov.w   R7, Data_Count          ; writing the byte count to memory
@@ -270,7 +270,7 @@ i2c_write_address
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag          ; clear the nack flag before the address byte is transmitted
             call    #i2c_start              ; send the start condition
-            mov.w   Adress,R4               ; move address from memory to register for formatting
+            mov.w   Address,R4               ; move address from memory to register for formatting
             rla.w   R4
             rla.w   R4
             rla.w   R4
@@ -386,7 +386,7 @@ i2c_read_address
             bis.b   #BIT2,&P3OUT
             mov.w   #00h,Nack_Flag
             call    #i2c_start
-            mov.w   Adress,R4
+            mov.w   Address,R4
             setc
             rlc.w   R4
             rla.w   R4
@@ -426,7 +426,7 @@ read_end    pop     R7
             pop     R4
             ret
             nop
-;-------------- END i2c_write --------------
+;-------------- END i2c_read --------------
 
 i2c_delay:
 
@@ -466,17 +466,17 @@ ISR_TB0_Overflow                            ; Triggers every 1.0s
 
 
 ;-------------------------------------------------------------------------------
-; Memmory Allocation
+; Memory Allocation
 ;-------------------------------------------------------------------------------
 
 		.data							; allocate variables in data memory
 		.retain							; keep allocations even if unused
 
 
-; Lab 6.3 - Step 3; Initialize and Reserve Locations in Data Memory
-Adress 	    .short	    000068h         ; 68h is the adress of the ds3231 RTC
+; Initialize and Reserve Locations in Data Memory
+Address 	.short	    000068h         ; 68h is the address of the ds3231 RTC
 
-SubAdress   .space      2               ; a place to store subaddresses of the rtc registers
+SubAddress  .space      2               ; a place to store subaddresses of the rtc registers
 
 Data        .space      2
 Tx          .space      18
